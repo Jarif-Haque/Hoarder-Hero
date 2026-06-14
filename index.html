@@ -93,6 +93,13 @@
             font-weight: 500;
         }
 
+        .header-badges-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            z-index: 10;
+        }
+
         .client-badge {
             background-color: rgba(255, 255, 255, 0.03);
             border: 1px solid rgba(255, 255, 255, 0.08);
@@ -115,6 +122,30 @@
             font-size: 1.2rem;
             font-weight: 800;
             color: #ffffff;
+        }
+
+        /* Sleek Button for Developer Login */
+        .dev-login-btn {
+            background: linear-gradient(135deg, rgba(155, 93, 229, 0.1) 0%, rgba(0, 180, 216, 0.1) 100%);
+            border: 1px solid rgba(0, 180, 216, 0.3);
+            color: var(--accent-blue);
+            padding: 0.8rem 1.4rem;
+            font-size: 0.9rem;
+            font-weight: 700;
+            border-radius: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition);
+        }
+
+        .dev-login-btn:hover {
+            border-color: var(--accent-green);
+            color: var(--accent-green);
+            background: rgba(0, 245, 212, 0.08);
+            box-shadow: 0 0 15px rgba(0, 245, 212, 0.15);
+            transform: translateY(-2px);
         }
 
         /* Grid Cards */
@@ -629,30 +660,6 @@
             border-color: #ffffff;
         }
 
-        /* Access Login Trigger */
-        .access-trigger {
-            text-align: center;
-            margin-top: 3rem;
-            padding-top: 2rem;
-            border-top: 1px solid rgba(255, 255, 255, 0.05);
-        }
-
-        .access-trigger-btn {
-            background: none;
-            border: none;
-            color: rgba(255, 255, 255, 0.15);
-            font-size: 0.75rem;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            transition: var(--transition);
-        }
-
-        .access-trigger-btn:hover {
-            color: var(--accent-blue);
-            text-shadow: 0 0 5px var(--accent-blue);
-        }
-
         @media (max-width: 768px) {
             header {
                 padding: 1.8rem;
@@ -660,8 +667,17 @@
                 align-items: stretch;
                 text-align: center;
             }
+            .header-badges-container {
+                flex-direction: column;
+                width: 100%;
+            }
             .client-badge {
+                width: 100%;
                 text-align: center;
+            }
+            .dev-login-btn {
+                width: 100%;
+                justify-content: center;
             }
             .timeline-wrapper {
                 flex-direction: column;
@@ -701,9 +717,16 @@
             <h1>HOARDER <span>HERO</span></h1>
             <p>Interactive Client Development Roadmap Tracker</p>
         </div>
-        <div class="client-badge">
-            <span class="label">Project Client</span>
-            <span class="val">toiahgordon</span>
+        <div class="header-badges-container">
+            <div class="client-badge">
+                <span class="label">Project Client</span>
+                <span class="val">toiahgordon</span>
+            </div>
+            <!-- PROMINENT SLEEK DEV PORTAL BUTTON -->
+            <button class="dev-login-btn" id="devLoginButton" onclick="triggerAdminLogin()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Developer Portal
+            </button>
         </div>
     </header>
 
@@ -810,11 +833,6 @@
         <div class="task-list" id="taskListContainer">
             <!-- Programmatic compilation will populate tasks here -->
         </div>
-    </div>
-
-    <!-- HIDDEN ACCESSIBLE LOGIN AREA -->
-    <div class="access-trigger">
-        <button class="access-trigger-btn" onclick="triggerAdminLogin()">🔐 Developer Workspace Console Login</button>
     </div>
 
 </div>
@@ -1194,12 +1212,23 @@
     // DEVELOPER CONSOLE INTERACTIVE ENGINE
     // =========================================================================
     function triggerAdminLogin() {
+        if (isAdminMode) {
+            logoutAdmin();
+            return;
+        }
+
         const password = prompt("Enter developer console special key to unlock admin workspace tools:");
         if (password === DEV_PASSKEY) {
             isAdminMode = true;
             document.getElementById("adminDock").style.display = "block";
+            
+            // Turn "Developer Portal" button into a Logout button visually
+            const devBtn = document.getElementById("devLoginButton");
+            devBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Exit Admin`;
+            devBtn.style.borderColor = "var(--accent-purple)";
+            devBtn.style.color = "var(--accent-purple)";
+
             recalculateProgress();
-            alert("Developer console unlocked! You can now change task statuses directly using dropdowns. Click 'Save & Export' when finished!");
         } else if (password !== null) {
             alert("Invalid Special Key! Access denied.");
         }
@@ -1208,6 +1237,13 @@
     function logoutAdmin() {
         isAdminMode = false;
         document.getElementById("adminDock").style.display = "none";
+        
+        // Reset "Developer Portal" button state
+        const devBtn = document.getElementById("devLoginButton");
+        devBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg> Developer Portal`;
+        devBtn.style.borderColor = "rgba(0, 180, 216, 0.3)";
+        devBtn.style.color = "var(--accent-blue)";
+
         recalculateProgress();
     }
 
@@ -1233,11 +1269,10 @@
         // Grab entire current DOM source code
         let sourceCode = document.documentElement.outerHTML;
 
-        // Extract script portion and replace with updated tasksData array
-        const startMarker = "// =========================================================================\n    // CLIENT DASHBOARD DATA SETUP (Change status to \"completed\", \"active\" or \"pending\")\n    // =========================================================================\n    const tasksData = [";
-        const endMarker = "];\n\n    // Password Configuration";
+        // Force reset the isAdminMode to false in the exported code so the client doesn't see the developer view upon loading!
+        sourceCode = sourceCode.replace("let isAdminMode = true;", "let isAdminMode = false;");
 
-        // If replacing inside the index.html template file directly
+        // Extract script portion and replace with updated tasksData array
         const startRegex = /(const tasksData = \[)([\s\S]*?)(\];\s*\/\/ Password Configuration)/;
         const replacement = `const tasksData = ${tasksString};\n\n    // Password Configuration`;
         
@@ -1261,5 +1296,5 @@
     window.onload = initDashboard;
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0b8fee61a77a07c',t:'MTc4MTQzNjU1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0b912a44dd33f11',t:'MTc4MTQzNzM1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
