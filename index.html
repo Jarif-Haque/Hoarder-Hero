@@ -643,6 +643,24 @@
             box-shadow: 0 5px 15px rgba(0, 245, 212, 0.4);
         }
 
+        .admin-reset-btn {
+            background-color: transparent;
+            color: #ff5400;
+            border: 1px solid rgba(255, 84, 0, 0.3);
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+            font-weight: 700;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .admin-reset-btn:hover {
+            background-color: rgba(255, 84, 0, 0.1);
+            color: #ffffff;
+            border-color: #ff5400;
+        }
+
         .admin-logout-btn {
             background-color: transparent;
             color: var(--text-muted);
@@ -845,6 +863,7 @@
             <div class="admin-bar-text">DEVELOPER MODE ACTIVE  |  Visual Progress Manager</div>
         </div>
         <div style="display: flex; gap: 15px; align-items: center;">
+            <button class="admin-reset-btn" onclick="resetToCodeDefaults()">Reset to File Defaults</button>
             <button class="admin-btn" onclick="exportUpdatedCode()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right: 5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
                 Save & Export index.html
@@ -859,7 +878,7 @@
     // =========================================================================
     // DYNAMIC TASK DATA MATRIX
     // =========================================================================
-    const tasksData = [
+    let tasksData = [
         {
             id: "1.1",
             phase: 1,
@@ -1039,11 +1058,44 @@
 
     // Password Configuration
     const DEV_PASSKEY = "hoarder777";
+    const STORAGE_KEY = "hoarder_hero_local_progress";
 
     let isAdminMode = false;
     let currentActivePhase = 1;
 
+    // =========================================================================
+    // LOCALSTORAGE AUTO-RESTORE ENGINE
+    // =========================================================================
+    function loadSavedProgress() {
+        const localData = localStorage.getItem(STORAGE_KEY);
+        if (localData) {
+            try {
+                const parsed = JSON.parse(localData);
+                // Simple validation to ensure data matches the matrix format
+                if (Array.isArray(parsed) && parsed.length === tasksData.length) {
+                    tasksData = parsed;
+                }
+            } catch (e) {
+                console.error("Local storage progress corrupted. Reverting to default values.", e);
+            }
+        }
+    }
+
+    function saveProgressLocally() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasksData));
+    }
+
+    function resetToCodeDefaults() {
+        if (confirm("Are you sure you want to discard your browser's local changes and reset progress back to the exact default values written in this HTML file?")) {
+            localStorage.removeItem(STORAGE_KEY);
+            // Reload the page to restore initial file state
+            window.location.reload();
+        }
+    }
+
     function initDashboard() {
+        // Load any saved progress from local storage BEFORE rendering
+        loadSavedProgress();
         // Run core rendering
         recalculateProgress();
     }
@@ -1257,6 +1309,10 @@
                 });
             }
             task.status = newStatus;
+            
+            // Auto-Save progress to local storage instantly
+            saveProgressLocally();
+            
             recalculateProgress();
         }
     }
@@ -1273,8 +1329,8 @@
         sourceCode = sourceCode.replace("let isAdminMode = true;", "let isAdminMode = false;");
 
         // Extract script portion and replace with updated tasksData array
-        const startRegex = /(const tasksData = \[)([\s\S]*?)(\];\s*\/\/ Password Configuration)/;
-        const replacement = `const tasksData = ${tasksString};\n\n    // Password Configuration`;
+        const startRegex = /(let tasksData = \[)([\s\S]*?)(\];\s*\/\/ Password Configuration)/;
+        const replacement = `let tasksData = ${tasksString};\n\n    // Password Configuration`;
         
         sourceCode = sourceCode.replace(startRegex, replacement);
 
@@ -1296,5 +1352,5 @@
     window.onload = initDashboard;
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0b912a44dd33f11',t:'MTc4MTQzNzM1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0b924b99f6272e3',t:'MTc4MTQzODA5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
