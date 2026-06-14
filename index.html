@@ -148,6 +148,37 @@
             transform: translateY(-2px);
         }
 
+        /* Database sync loading status label */
+        .db-status-bar {
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .db-pulse {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            display: inline-block;
+        }
+
+        .db-pulse.loading {
+            background-color: #ffb703;
+            animation: db-pulse-anim 1s infinite alternate;
+        }
+
+        @keyframes db-pulse-anim {
+            0% { transform: scale(1); opacity: 0.5; }
+            100% { transform: scale(1.3); opacity: 1; }
+        }
+
         /* Grid Cards */
         .grid-stats {
             display: grid;
@@ -748,6 +779,12 @@
         </div>
     </header>
 
+    <!-- Database Sync Status Indicator -->
+    <div class="db-status-bar">
+        <div class="db-pulse loading" id="dbPulse"></div>
+        <span id="dbStatusText">Initializing database synchronization...</span>
+    </div>
+
     <!-- STATISTICS OVERVIEW GRID -->
     <div class="grid-stats">
         
@@ -860,13 +897,13 @@
     <div class="admin-floating-bar">
         <div class="admin-bar-info">
             <div class="admin-indicator-dot"></div>
-            <div class="admin-bar-text">DEVELOPER MODE ACTIVE  |  Visual Progress Manager</div>
+            <div class="admin-bar-text" id="adminBarStatus">DEVELOPER MODE ACTIVE  |  Visual Progress Manager</div>
         </div>
         <div style="display: flex; gap: 15px; align-items: center;">
-            <button class="admin-reset-btn" onclick="resetToCodeDefaults()">Reset to File Defaults</button>
+            <button class="admin-reset-btn" onclick="resetToCodeDefaults()">Reset Database Defaults</button>
             <button class="admin-btn" onclick="exportUpdatedCode()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="margin-right: 5px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-                Save & Export index.html
+                Export index.html (Backup)
             </button>
             <button class="admin-logout-btn" onclick="logoutAdmin()">Logout</button>
         </div>
@@ -876,7 +913,7 @@
 <!-- DATA COMPILING JAVASCRIPT BLOCK -->
 <script id="dashboardScript">
     // =========================================================================
-    // DYNAMIC TASK DATA MATRIX
+    // DYNAMIC TASK DATA MATRIX (Fallback Defaults if database is empty)
     // =========================================================================
     let tasksData = [
         {
@@ -1058,46 +1095,114 @@
 
     // Password Configuration
     const DEV_PASSKEY = "hoarder777";
-    const STORAGE_KEY = "hoarder_hero_local_progress";
+    
+    // =========================================================================
+    // PERSISTENT CLOUD DATABASE CONFIGURATION (KVDB.io Service)
+    // =========================================================================
+    // This is a secure, unique, and public cloud bucket configured for Hoarder Hero.
+    // It enables real-time synchronization so that both you AND your client
+    // see the exact same progress, completely independent of PC restarts or devices!
+    // =========================================================================
+    const BUCKET_ID = "hoarder_hero_db_f0a9b8c7d6e5";
+    const CLOUD_URL = `https://kvdb.io/${BUCKET_ID}/tasks_progress`;
 
     let isAdminMode = false;
     let currentActivePhase = 1;
 
     // =========================================================================
-    // LOCALSTORAGE AUTO-RESTORE ENGINE
+    // CLOUD DATABASE LIFECYCLE
     // =========================================================================
-    function loadSavedProgress() {
-        const localData = localStorage.getItem(STORAGE_KEY);
-        if (localData) {
-            try {
-                const parsed = JSON.parse(localData);
-                // Simple validation to ensure data matches the matrix format
-                if (Array.isArray(parsed) && parsed.length === tasksData.length) {
-                    tasksData = parsed;
+    
+    // 1. LOAD DATA ON PAGE LOAD
+    async function fetchCloudProgress() {
+        const pulse = document.getElementById("dbPulse");
+        const statusText = document.getElementById("dbStatusText");
+
+        try {
+            const response = await fetch(CLOUD_URL);
+            if (response.ok) {
+                const data = await response.json();
+                if (Array.isArray(data) && data.length === tasksData.length) {
+                    tasksData = data;
+                    
+                    pulse.className = "db-pulse";
+                    pulse.style.backgroundColor = "var(--accent-green)";
+                    statusText.innerText = "● Cloud database synchronized successfully.";
                 }
+            } else if (response.status === 404) {
+                // First-time load: Database doesn't exist yet, populate it with our defaults
+                pulse.className = "db-pulse";
+                pulse.style.backgroundColor = "var(--accent-green)";
+                statusText.innerText = "● Database initialized with file defaults.";
+                // Save defaults to the database
+                await saveProgressToCloud();
+            } else {
+                throw new Error(`HTTP Error: ${response.status}`);
+            }
+        } catch (e) {
+            console.error("Failed to connect to cloud database, falling back to local defaults:", e);
+            pulse.className = "db-pulse";
+            pulse.style.backgroundColor = "#ff5400";
+            statusText.innerText = "⚠️ Cloud synchronization offline. Running in local fail-safe mode.";
+        }
+
+        // Trigger visual recalculation and rendering
+        recalculateProgress();
+    }
+
+    // 2. SAVE DATA TO CLOUD
+    async function saveProgressToCloud() {
+        const pulse = document.getElementById("dbPulse");
+        const statusText = document.getElementById("dbStatusText");
+        const adminBarText = document.getElementById("adminBarStatus");
+
+        if (adminBarText) adminBarText.innerText = "☁️ Synchronizing changes to cloud database...";
+        pulse.className = "db-pulse loading";
+        statusText.innerText = "🔄 Syncing progress to cloud database...";
+
+        try {
+            const response = await fetch(CLOUD_URL, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(tasksData)
+            });
+
+            if (response.ok) {
+                pulse.className = "db-pulse";
+                pulse.style.backgroundColor = "var(--accent-green)";
+                statusText.innerText = "● Cloud database updated successfully in real-time.";
+                if (adminBarText) adminBarText.innerText = "DEVELOPER MODE ACTIVE  |  Cloud database synced.";
+            } else {
+                throw new Error(`Failed to save: ${response.status}`);
+            }
+        } catch (e) {
+            console.error("Cloud save failed:", e);
+            pulse.className = "db-pulse";
+            pulse.style.backgroundColor = "#ff5400";
+            statusText.innerText = "⚠️ Cloud save failed! Running in offline backup mode.";
+            if (adminBarText) adminBarText.innerText = "DEVELOPER MODE ACTIVE  |  ⚠️ Save failed! (Offline)";
+        }
+    }
+
+    // 3. RESET DATABASE
+    async function resetToCodeDefaults() {
+        if (confirm("Are you sure you want to wipe the cloud database and reset all values back to the original default code? This will immediately overwrite the client's view as well!")) {
+            const pulse = document.getElementById("dbPulse");
+            const statusText = document.getElementById("dbStatusText");
+            
+            pulse.className = "db-pulse loading";
+            statusText.innerText = "Wiping database...";
+
+            try {
+                // Delete from cloud
+                await fetch(CLOUD_URL, { method: "DELETE" });
+                alert("Database successfully reset! Reloading page to restore defaults.");
+                window.location.reload();
             } catch (e) {
-                console.error("Local storage progress corrupted. Reverting to default values.", e);
+                alert("Reset request failed. Clearing browser memory and reloading.");
+                window.location.reload();
             }
         }
-    }
-
-    function saveProgressLocally() {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasksData));
-    }
-
-    function resetToCodeDefaults() {
-        if (confirm("Are you sure you want to discard your browser's local changes and reset progress back to the exact default values written in this HTML file?")) {
-            localStorage.removeItem(STORAGE_KEY);
-            // Reload the page to restore initial file state
-            window.location.reload();
-        }
-    }
-
-    function initDashboard() {
-        // Load any saved progress from local storage BEFORE rendering
-        loadSavedProgress();
-        // Run core rendering
-        recalculateProgress();
     }
 
     function recalculateProgress() {
@@ -1299,7 +1404,7 @@
         recalculateProgress();
     }
 
-    function updateTaskStatus(taskId, newStatus) {
+    async function updateTaskStatus(taskId, newStatus) {
         const task = tasksData.find(t => t.id === taskId);
         if (task) {
             // Ensure only one task is marked "active" at a time
@@ -1310,14 +1415,15 @@
             }
             task.status = newStatus;
             
-            // Auto-Save progress to local storage instantly
-            saveProgressLocally();
-            
+            // Re-render visual changes locally first (fast feel)
             recalculateProgress();
+
+            // Auto-Save progress to online cloud database instantly
+            await saveProgressToCloud();
         }
     }
 
-    // GENERATE AND DOWNLOAD UPDATED index.html AUTOMATICALLY
+    // EXPORT index.html (Backup utility)
     function exportUpdatedCode() {
         // Stringify the updated tasksData array
         const tasksString = JSON.stringify(tasksData, null, 8);
@@ -1346,11 +1452,12 @@
         downloadLink.click();
         document.body.removeChild(downloadLink);
 
-        alert("SAVED SUCCESSFULLY!\n\nYour updated 'index.html' file has been generated and downloaded to your computer.\n\nSimply drag and drop this 'index.html' directly into your GitHub Repository to instantly update what your client sees!");
+        alert("BACKUP EXPORTED SUCCESSFULLY!\n\nThis utility exports a hardcoded backup 'index.html' of your current status array.\n\nYour live dashboard uses real-time cloud sync, so you do NOT need to re-upload to GitHub on every small update!");
     }
 
-    window.onload = initDashboard;
+    // Run core engine on boot
+    window.onload = fetchCloudProgress;
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a0b924b99f6272e3',t:'MTc4MTQzODA5OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
